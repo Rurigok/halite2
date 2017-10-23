@@ -17,6 +17,7 @@ import logging
 import torch
 
 NUM_FEATURES = 6
+HAS_CUDA = torch.cuda.is_available()
 
 def convert_map_to_tensor(game_map, input_tensor):
 
@@ -48,8 +49,11 @@ def main():
     game = hlt.Game("Anathema")
     logging.info("Starting << anathema >>")
 
-    # Initialize zero input tensor
+    # Initialize zeroed input tensor
     input_tensor = torch.FloatTensor(NUM_FEATURES, game.map.width, game.map.height).zero_()
+
+    if HAS_CUDA:
+        input_tensor = input_tensor.cuda()
 
     while True:
         # TURN START
