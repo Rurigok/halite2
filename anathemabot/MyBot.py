@@ -1,18 +1,9 @@
 """
-Welcome to your first Halite-II bot!
-
-This bot's name is Settler. It's purpose is simple (don't expect it to win complex games :) ):
-1. Initialize game
-2. If a ship is not docked and there are unowned planets
-2.a. Try to Dock in the planet if close enough
-2.b If not, go towards the planet
-
-Note: Please do not place print statements here as they are used to communicate with the Halite engine. If you need
-to log anything use the logging module.
+Anathema: self-play reinforcement learning via a convolutional neural network
 """
-# Let's start by importing the Halite Starter Kit so we can interface with the Halite engine
+from anathema import net as anet
+
 import hlt
-# Then let's import the logging module so we can print out information
 import logging
 import torch
 
@@ -54,6 +45,8 @@ def main():
 
     if HAS_CUDA:
         input_tensor = input_tensor.cuda()
+
+    net = anet.Net()
 
     while True:
         # TURN START

@@ -5,10 +5,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-class Bot(nn.Module):
+class Net(nn.Module):
 
     def __init__(self):
-        super(Bot, self).__init__()
+        super(Net, self).__init__()
 
         # self.fc1 = nn.Linear(2, 10)
         # self.fc2 = nn.Linear(10, 1)
@@ -35,7 +35,8 @@ class Bot(nn.Module):
         criterion = nn.MSELoss()
         optimizer = optim.RMSprop(self.parameters())
 
-        self.cuda()
+        if torch.cuda.is_available():
+            self.cuda()
 
         for epoch in range(1000):  # loop over the dataset multiple times
             if epoch % 100 == 0:
@@ -46,7 +47,10 @@ class Bot(nn.Module):
 
 
                 # wrap them in Variable
-                ins, outs = Variable(inputs.cuda()), Variable(labels.cuda())
+                if torch.cuda.is_available():
+                    inputs = inputs.cuda()
+                    labels = labels.cuda()
+                ins, outs = Variable(inputs), Variable(labels)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
