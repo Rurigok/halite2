@@ -10,29 +10,34 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        # self.fc1 = nn.Linear(2, 10)
-        # self.fc2 = nn.Linear(10, 1)
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(7, 256, kernel_size=7, stride=1, padding=3),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
 
-        self.cc1 = nn.Conv2d(3, 10, 7, stride=1, padding=3)
-        self.cc2 = nn.Conv2d(10, 30, 7, stride=1, padding=3)
-        self.cc3 = nn.Conv2d(30, 30, 5, stride=1, padding=2)
-        self.cc4 = nn.Conv2d(30, 3, 5, stride=1, padding=2)
-        # self.cc3 = nn.ConvTranspose2d(10, 5, 3)
-        # self.cc4 = nn.ConvTranspose2d(5, 3, 3)
+        self.layer2 = nn.Sequential(
+            nn.Conv2d(256, 512, kernel_size=7, stride=1, padding=3),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
 
+        self.fc1 = nn.Linear(1024, 512)
+        self.fc2 = nn.Linear(512, 4)
 
     def forward(self, x):
-
-        x = F.tanh(self.cc1(x))
-        x = F.tanh(self.cc2(x))
-        x = F.tanh(self.cc3(x))
-        x = F.tanh(self.cc4(x))
-
-        return x
+        out = self.layer1(x)
+        out = self.layer2(out)
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+        out = self.fc(out)
+        return out
 
     def my_train(self, inputs, labels):
 
-        criterion = nn.MSELoss()
+        criterion = nn.CrossEntropyLoss()
         optimizer = optim.RMSprop(self.parameters())
 
         if torch.cuda.is_available():
