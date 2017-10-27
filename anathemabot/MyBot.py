@@ -10,7 +10,9 @@ import torch
 NUM_FEATURES = 7
 HAS_CUDA = torch.cuda.is_available()
 
-def convert_map_to_tensor(game_map, input_tensor):
+def convert_map_to_tensor(game_map, input_tensor, my_ship_locations):
+
+    my_ship_locations.clear()
 
     # feature vector: [ship hp, ship friendliness, docking status, planet hp, planet size, % docked_ships, planet friendliness]
     for player in game_map.all_players():
@@ -24,6 +26,9 @@ def convert_map_to_tensor(game_map, input_tensor):
             input_tensor[0][1][x][y] = owner_feature
             # 0 if undocked, .33 if docked, .66 if docking, 1 if undocking
             input_tensor[0][2][x][y] = ship.docking_status.value / 3
+
+            if owner_feature == 0:
+                my_ship_locations.append((x, y))
 
     for planet in game_map.all_planets():
         x = int(planet.x)
@@ -44,25 +49,26 @@ def main():
 
     # Initialize zeroed input tensor
     input_tensor = torch.FloatTensor(1, NUM_FEATURES, game.map.width, game.map.height).zero_()
-
     if HAS_CUDA:
         input_tensor = input_tensor.cuda()
 
     net = anet.Net()
 
     game_history = []
+    my_ship_locations = []
 
     while True:
         # TURN START
         game_map = game.update_map()
 
         # Rebuild our input tensor based on the map state for this turn
-        convert_map_to_tensor(game_map, input_tensor)
+        convert_map_to_tensor(game_map, input_tensor, my_ship_locations)
         #input_tensor = input_tensor.unsqueeze(0)
         vi = torch.autograd.Variable(input_tensor)
         move_commands = net.forward(vi)
 
-        logging.info(move_commands)
+        for (x, y) in my_ship_locations:
+            vel, angle, dock, undock = move_commands[:][x][y]
 
         # Here we define the set of commands to be sent to the Halite engine at the end of the turn
         command_queue = []
