@@ -19,23 +19,23 @@ def convert_map_to_tensor(game_map, input_tensor):
             x = int(ship.x)
             y = int(ship.y)
             # hp from [0, 1]
-            input_tensor[0][x][y] = ship.health / 255
+            input_tensor[0][0][x][y] = ship.health / 255
             # friendless: 0 if me, 1 if enemy
-            input_tensor[1][x][y] = owner_feature
+            input_tensor[0][1][x][y] = owner_feature
             # 0 if undocked, .33 if docked, .66 if docking, 1 if undocking
-            input_tensor[2][x][y] = ship.docking_status / 3
+            input_tensor[0][2][x][y] = ship.docking_status.value / 3
 
     for planet in game_map.all_planets():
         x = int(planet.x)
         y = int(planet.y)
         # hp from [0, 1]
-        input_tensor[3][x][y] = planet.health / (planet.radius * 255)
+        input_tensor[0][3][x][y] = planet.health / (planet.radius * 255)
         # radius from [0, 1]
-        input_tensor[4][x][y] = (planet.radius - 3) / 5
+        input_tensor[0][4][x][y] = (planet.radius - 3) / 5
         # % of docked ships [0, 1]
-        input_tensor[5][x][y] = len(planet.all_docked_ships()) / planet.num_docking_spots
+        input_tensor[0][5][x][y] = len(planet.all_docked_ships()) / planet.num_docking_spots
         # owner of this planet: -1 if me, 1 if enemy, 0 if unowned
-        input_tensor[6][x][y] = (-1 if planet.owner == game_map.my_id else 1) if planet.is_owned() else 0
+        input_tensor[0][6][x][y] = (-1 if planet.owner == game_map.my_id else 1) if planet.is_owned() else 0
 
 def main():
     # GAME START
@@ -43,7 +43,7 @@ def main():
     logging.info("Starting << anathema >>")
 
     # Initialize zeroed input tensor
-    input_tensor = torch.FloatTensor(NUM_FEATURES, game.map.width, game.map.height).zero_()
+    input_tensor = torch.FloatTensor(1, NUM_FEATURES, game.map.width, game.map.height).zero_()
 
     if HAS_CUDA:
         input_tensor = input_tensor.cuda()
@@ -58,6 +58,11 @@ def main():
 
         # Rebuild our input tensor based on the map state for this turn
         convert_map_to_tensor(game_map, input_tensor)
+        #input_tensor = input_tensor.unsqueeze(0)
+        vi = torch.autograd.Variable(input_tensor)
+        move_commands = net.forward(vi)
+
+        logging.info(move_commands)
 
         # Here we define the set of commands to be sent to the Halite engine at the end of the turn
         command_queue = []

@@ -10,29 +10,16 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.layer1 = nn.Sequential(
-            nn.Conv2d(7, 256, kernel_size=7, stride=1, padding=3),
-            nn.BatchNorm2d(256),
-            nn.ReLU(),
-            nn.MaxPool2d(2)
-        )
-
-        self.layer2 = nn.Sequential(
-            nn.Conv2d(256, 512, kernel_size=7, stride=1, padding=3),
-            nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.MaxPool2d(2)
-        )
-
-        self.fc1 = nn.Linear(1024, 512)
-        self.fc2 = nn.Linear(512, 4)
+        self.layer1 = nn.Conv2d(7, 256, kernel_size=7, stride=1, padding=3)
+        self.layer2 = nn.Conv2d(256, 128, kernel_size=7, stride=1, padding=3)
+        self.layer3 = nn.Conv2d(128, 64, kernel_size=7, stride=1, padding=3)
+        self.layer4 = nn.Conv2d(64, 5, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
         out = self.layer1(x)
         out = self.layer2(out)
-        out = out.view(out.size(0), -1)
-        out = self.fc(out)
-        out = self.fc(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
         return out
 
     def my_train(self, inputs, labels):
