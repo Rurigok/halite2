@@ -7,10 +7,13 @@ import hlt
 import logging
 import torch
 import random, math
+import numpy as np
 
 NUM_FEATURES = 7
 NUM_OUTPUT_FEATURES = 3
 HAS_CUDA = torch.cuda.is_available()
+
+
 
 def convert_map_to_tensor(game_map, input_tensor, my_ship_locations):
 
@@ -50,6 +53,8 @@ def one_or_negative_one():
 def distribution():
     return (1 - math.sqrt(1 - random.random()))
 
+clamp = np.clip
+
 def main():
     # GAME START
     game = hlt.Game("Anathema")
@@ -59,8 +64,10 @@ def main():
     input_tensor = torch.FloatTensor(1, NUM_FEATURES, game.map.width, game.map.height).zero_()
     output_tensor = torch.FloatTensor(1, NUM_OUTPUT_FEATURES, game.map.width, game.map.height).zero_()
 
-    if False and HAS_CUDA:
+    if HAS_CUDA:
         input_tensor = input_tensor.cuda()
+        output_tensor = output_tensor.cuda()
+        logging.info("Made it here")
 
     net = anet.Net()
 
@@ -75,7 +82,9 @@ def main():
         # Rebuild our input tensor based on the map state for this turn
         convert_map_to_tensor(game_map, input_tensor, my_ship_locations)
         #input_tensor = input_tensor.unsqueeze(0)
-        vi = torch.autograd.Variable(input_tensor)
+
+        vi = torch.autograd.Variable(input_tensor).cuda()
+
         move_commands = net.forward(vi)[0].permute(1, 2, 0)
 
         for (x, y) in my_ship_locations:
@@ -87,14 +96,14 @@ def main():
             # Set angle of the output tensor to the skewed angle
             output_tensor[0][0][x][y] = angle
 
-            command_angle = int(360 * angle)
+            command_angle = int(360 * angle) % 360
 
             speed = speed + (one_or_negative_one() * distribution())
 
             # Set speed of the output tensor to skewed speed
             output_tensor[0][1][x][y] = speed
 
-            command_speed = int(7 * speed)
+            command_speed = clamp(int(7 * speed), 0, 7)
 
             dock = dock + (one_or_negative_one() * distribution())
 
