@@ -19,10 +19,10 @@ class Net(nn.Module):
         self.layer4 = nn.Conv2d(16, 3, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
-        out = self.layer1(x)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
+        out = F.sigmoid(self.layer1(x))
+        out = F.sigmoid(self.layer2(out))
+        out = F.sigmoid(self.layer3(out))
+        out = F.sigmoid(self.layer4(out))
         return out
 
     def my_train(self, inputs, labels):

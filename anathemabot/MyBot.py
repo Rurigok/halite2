@@ -30,7 +30,7 @@ def convert_map_to_tensor(game_map, input_tensor, my_ship_locations):
             input_tensor[0][2][x][y] = ship.docking_status.value / 3
 
             if owner_feature == 0:
-                my_ship_locations.append((x, y))
+                my_ship_locations[(x, y)] = ship
 
     for planet in game_map.all_planets():
         x = int(planet.x)
@@ -57,7 +57,6 @@ def main():
 
     # Initialize zeroed input tensor
     input_tensor = torch.FloatTensor(1, NUM_FEATURES, game.map.width, game.map.height).zero_()
-
     output_tensor = torch.FloatTensor(1, NUM_OUTPUT_FEATURES, game.map.width, game.map.height).zero_()
 
     if False and HAS_CUDA:
@@ -66,23 +65,22 @@ def main():
     net = anet.Net()
 
     game_history = []
-    my_ship_locations = []
+    my_ship_locations = {}
 
     while True:
         # TURN START
         game_map = game.update_map()
+        command_queue = []
 
         # Rebuild our input tensor based on the map state for this turn
         convert_map_to_tensor(game_map, input_tensor, my_ship_locations)
         #input_tensor = input_tensor.unsqueeze(0)
         vi = torch.autograd.Variable(input_tensor)
         move_commands = net.forward(vi)[0].permute(1, 2, 0)
-        logging.info(move_commands.size())
 
         for (x, y) in my_ship_locations:
-            angle, speed, dock = move_commands[x][y]
-
-
+            this_ship = my_ship_locations[(x, y)]
+            angle, speed, dock = move_commands[x][y].data
 
             angle = (angle + (one_or_negative_one() * distribution()))
 
@@ -96,7 +94,7 @@ def main():
             # Set speed of the output tensor to skewed speed
             output_tensor[0][1][x][y] = speed
 
-            command_speed = 7 * speed
+            command_speed = int(7 * speed)
 
             dock = dock + (one_or_negative_one() * distribution())
 
@@ -104,10 +102,24 @@ def main():
 
             command_dock = dock
 
-
+            # [0, .5) = undock
+            # [.5 , 1] = dock
+            if command_dock < .5:
+                # we want to undock
+                if this_ship.docking_status.value == this_ship.DockingStatus.DOCKED:
+                    command_queue.append(this_ship.undock())
+                else:
+                    command_queue.append(this_ship.thrust(command_speed, command_angle))
+            else:
+                # we want to dock
+                if this_ship.docking_status.value == this_ship.DockingStatus.UNDOCKED:
+                    #command_queue.append(this_ship.dock()) HARD TO DO
+                    pass
+                else:
+                    command_queue.append(this_ship.thrust(command_speed, command_angle))
 
         # Here we define the set of commands to be sent to the Halite engine at the end of the turn
-        command_queue = []
+
         # For every ship that I control
         # for ship in game_map.get_me().all_ships():
         #     # If the ship is docked
