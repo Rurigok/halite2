@@ -6,8 +6,10 @@ from anathema import net as anet
 import hlt
 import logging
 import torch
+import random, math
 
 NUM_FEATURES = 7
+NUM_OUTPUT_FEATURES = 3
 HAS_CUDA = torch.cuda.is_available()
 
 def convert_map_to_tensor(game_map, input_tensor, my_ship_locations):
@@ -42,6 +44,12 @@ def convert_map_to_tensor(game_map, input_tensor, my_ship_locations):
         # owner of this planet: -1 if me, 1 if enemy, 0 if unowned
         input_tensor[0][6][x][y] = (-1 if planet.owner == game_map.my_id else 1) if planet.is_owned() else 0
 
+def one_or_negative_one():
+    return 1 if random.random() > .5 else -1
+
+def distribution():
+    return (1 - math.sqrt(1 - random.random()))
+
 def main():
     # GAME START
     game = hlt.Game("Anathema")
@@ -49,7 +57,10 @@ def main():
 
     # Initialize zeroed input tensor
     input_tensor = torch.FloatTensor(1, NUM_FEATURES, game.map.width, game.map.height).zero_()
-    if HAS_CUDA:
+
+    output_tensor = torch.FloatTensor(1, NUM_OUTPUT_FEATURES, game.map.width, game.map.height).zero_()
+
+    if False and HAS_CUDA:
         input_tensor = input_tensor.cuda()
 
     net = anet.Net()
@@ -65,48 +76,73 @@ def main():
         convert_map_to_tensor(game_map, input_tensor, my_ship_locations)
         #input_tensor = input_tensor.unsqueeze(0)
         vi = torch.autograd.Variable(input_tensor)
-        move_commands = net.forward(vi)
+        move_commands = net.forward(vi)[0].permute(1, 2, 0)
+        logging.info(move_commands.size())
 
         for (x, y) in my_ship_locations:
-            vel, angle, dock, undock = move_commands[:][x][y]
+            angle, speed, dock = move_commands[x][y]
+
+
+
+            angle = (angle + (one_or_negative_one() * distribution()))
+
+            # Set angle of the output tensor to the skewed angle
+            output_tensor[0][0][x][y] = angle
+
+            command_angle = int(360 * angle)
+
+            speed = speed + (one_or_negative_one() * distribution())
+
+            # Set speed of the output tensor to skewed speed
+            output_tensor[0][1][x][y] = speed
+
+            command_speed = 7 * speed
+
+            dock = dock + (one_or_negative_one() * distribution())
+
+            # Set dock of the output tensor to skewed dock
+
+            command_dock = dock
+
+
 
         # Here we define the set of commands to be sent to the Halite engine at the end of the turn
         command_queue = []
         # For every ship that I control
-        for ship in game_map.get_me().all_ships():
-            # If the ship is docked
-            if ship.docking_status != ship.DockingStatus.UNDOCKED:
-                # Skip this ship
-                continue
-
-            # For each planet in the game (only non-destroyed planets are included)
-            for planet in game_map.all_planets():
-                # If the planet is owned
-                if planet.is_owned():
-                    # Skip this planet
-                    continue
-
-                # If we can dock, let's (try to) dock. If two ships try to dock at once, neither will be able to.
-                if ship.can_dock(planet):
-                    # We add the command by appending it to the command_queue
-                    command_queue.append(ship.dock(planet))
-                else:
-                    # If we can't dock, we move towards the closest empty point near this planet (by using closest_point_to)
-                    # with constant speed. Don't worry about pathfinding for now, as the command will do it for you.
-                    # We run this navigate command each turn until we arrive to get the latest move.
-                    # Here we move at half our maximum speed to better control the ships
-                    # In order to execute faster we also choose to ignore ship collision calculations during navigation.
-                    # This will mean that you have a higher probability of crashing into ships, but it also means you will
-                    # make move decisions much quicker. As your skill progresses and your moves turn more optimal you may
-                    # wish to turn that option off.
-                    navigate_command = ship.navigate(ship.closest_point_to(planet), game_map,
-                                                     speed=hlt.constants.MAX_SPEED / 2, ignore_ships=True)
-                    # If the move is possible, add it to the command_queue (if there are too many obstacles on the way
-                    # or we are trapped (or we reached our destination!), navigate_command will return null;
-                    # don't fret though, we can run the command again the next turn)
-                    if navigate_command:
-                        command_queue.append(navigate_command)
-                break
+        # for ship in game_map.get_me().all_ships():
+        #     # If the ship is docked
+        #     if ship.docking_status != ship.DockingStatus.UNDOCKED:
+        #         # Skip this ship
+        #         continue
+        #
+        #     # For each planet in the game (only non-destroyed planets are included)
+        #     for planet in game_map.all_planets():
+        #         # If the planet is owned
+        #         if planet.is_owned():
+        #             # Skip this planet
+        #             continue
+        #
+        #         # If we can dock, let's (try to) dock. If two ships try to dock at once, neither will be able to.
+        #         if ship.can_dock(planet):
+        #             # We add the command by appending it to the command_queue
+        #             command_queue.append(ship.dock(planet))
+        #         else:
+        #             # If we can't dock, we move towards the closest empty point near this planet (by using closest_point_to)
+        #             # with constant speed. Don't worry about pathfinding for now, as the command will do it for you.
+        #             # We run this navigate command each turn until we arrive to get the latest move.
+        #             # Here we move at half our maximum speed to better control the ships
+        #             # In order to execute faster we also choose to ignore ship collision calculations during navigation.
+        #             # This will mean that you have a higher probability of crashing into ships, but it also means you will
+        #             # make move decisions much quicker. As your skill progresses and your moves turn more optimal you may
+        #             # wish to turn that option off.
+        #             navigate_command = ship.navigate(ship.closest_point_to(planet), game_map,
+        #                                              speed=hlt.constants.MAX_SPEED / 2, ignore_ships=True)
+        #             # If the move is possible, add it to the command_queue (if there are too many obstacles on the way
+        #             # or we are trapped (or we reached our destination!), navigate_command will return null;
+        #             # don't fret though, we can run the command again the next turn)
+        #             if navigate_command:
+        #                 command_queue.append(navigate_command)
+        #         break
 
         # Send our set of commands to the Halite engine for this turn
         game.send_command_queue(command_queue)

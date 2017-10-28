@@ -10,10 +10,13 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.layer1 = nn.Conv2d(7, 256, kernel_size=7, stride=1, padding=3)
-        self.layer2 = nn.Conv2d(256, 128, kernel_size=7, stride=1, padding=3)
-        self.layer3 = nn.Conv2d(128, 64, kernel_size=7, stride=1, padding=3)
-        self.layer4 = nn.Conv2d(64, 5, kernel_size=3, stride=1, padding=1)
+        if torch.cuda.is_available():
+            self.cuda()
+
+        self.layer1 = nn.Conv2d(7, 16, kernel_size=7, stride=1, padding=3)
+        self.layer2 = nn.Conv2d(16, 16, kernel_size=7, stride=1, padding=3)
+        self.layer3 = nn.Conv2d(16, 16, kernel_size=7, stride=1, padding=3)
+        self.layer4 = nn.Conv2d(16, 3, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
         out = self.layer1(x)
@@ -27,7 +30,7 @@ class Net(nn.Module):
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.RMSprop(self.parameters())
 
-        if torch.cuda.is_available():
+        if False and torch.cuda.is_available():
             self.cuda()
 
         for epoch in range(1000):  # loop over the dataset multiple times
