@@ -75,7 +75,11 @@ def main():
 
         # Rebuild our input tensor based on the map state for this turn
         convert_map_to_tensor(game_map, input_tensor, my_ships)
-        vi = torch.autograd.Variable(input_tensor).cuda()
+        vi = torch.autograd.Variable(input_tensor)
+
+        if HAS_CUDA:
+            vi = vi.cuda()
+
         move_commands = net.forward(vi)[0].permute(1, 2, 0)
 
         for (x, y) in my_ships:
