@@ -12,9 +12,8 @@ NUM_FEATURES = 7
 NUM_OUTPUT_FEATURES = 3
 HAS_CUDA = torch.cuda.is_available()
 
-def convert_map_to_tensor(game_map, input_tensor, my_ship_locations):
-
-    my_ship_locations.clear()
+def convert_map_to_tensor(game_map, input_tensor, my_ships):
+    my_ships.clear()
 
     # feature vector: [ship hp, ship friendliness, docking status, planet hp, planet size, % docked_ships, planet friendliness]
     for player in game_map.all_players():
@@ -30,7 +29,7 @@ def convert_map_to_tensor(game_map, input_tensor, my_ship_locations):
             input_tensor[0][2][x][y] = ship.docking_status.value / 3
 
             if owner_feature == 0:
-                my_ship_locations[(x, y)] = ship
+                my_ships[(x, y)] = ship
 
     for planet in game_map.all_planets():
         x = int(planet.x)
@@ -59,13 +58,12 @@ def main():
     input_tensor = torch.FloatTensor(1, NUM_FEATURES, game.map.width, game.map.height).zero_()
     output_tensor = torch.FloatTensor(1, NUM_OUTPUT_FEATURES, game.map.width, game.map.height).zero_()
 
-    if False and HAS_CUDA:
+    if HAS_CUDA:
         input_tensor = input_tensor.cuda()
 
     net = anet.Net()
-
-    game_history = []
-    my_ship_locations = {}
+    outputs = []
+    my_ships = {}
 
     while True:
         # TURN START
@@ -73,37 +71,29 @@ def main():
         command_queue = []
 
         # Rebuild our input tensor based on the map state for this turn
-        convert_map_to_tensor(game_map, input_tensor, my_ship_locations)
-        #input_tensor = input_tensor.unsqueeze(0)
+        convert_map_to_tensor(game_map, input_tensor, my_ships)
         vi = torch.autograd.Variable(input_tensor)
         move_commands = net.forward(vi)[0].permute(1, 2, 0)
 
-        for (x, y) in my_ship_locations:
-            this_ship = my_ship_locations[(x, y)]
+        for (x, y) in my_ships:
+            this_ship = my_ships[(x, y)]
             angle, speed, dock = move_commands[x][y].data
 
             angle = (angle + (one_or_negative_one() * distribution()))
-
-            # Set angle of the output tensor to the skewed angle
             output_tensor[0][0][x][y] = angle
-
             command_angle = int(360 * angle)
 
             speed = speed + (one_or_negative_one() * distribution())
-
-            # Set speed of the output tensor to skewed speed
             output_tensor[0][1][x][y] = speed
-
             command_speed = int(7 * speed)
 
             dock = dock + (one_or_negative_one() * distribution())
-
-            # Set dock of the output tensor to skewed dock
-
+            output_tensor[0][2][x][y] = dock
             command_dock = dock
 
-            # [0, .5) = undock
-            # [.5 , 1] = dock
+            outputs.append(output_tensor)
+
+            # Execute ship command
             if command_dock < .5:
                 # we want to undock
                 if this_ship.docking_status.value == this_ship.DockingStatus.DOCKED:
@@ -113,53 +103,17 @@ def main():
             else:
                 # we want to dock
                 if this_ship.docking_status.value == this_ship.DockingStatus.UNDOCKED:
-                    #command_queue.append(this_ship.dock()) HARD TO DO
-                    pass
+                    closest_planet = this_ship.closest_planet(game_map)
+                    if this_ship.can_dock(closest_planet):
+                        command_queue.append(this_ship.dock(closest_planet))
                 else:
                     command_queue.append(this_ship.thrust(command_speed, command_angle))
-
-        # Here we define the set of commands to be sent to the Halite engine at the end of the turn
-
-        # For every ship that I control
-        # for ship in game_map.get_me().all_ships():
-        #     # If the ship is docked
-        #     if ship.docking_status != ship.DockingStatus.UNDOCKED:
-        #         # Skip this ship
-        #         continue
-        #
-        #     # For each planet in the game (only non-destroyed planets are included)
-        #     for planet in game_map.all_planets():
-        #         # If the planet is owned
-        #         if planet.is_owned():
-        #             # Skip this planet
-        #             continue
-        #
-        #         # If we can dock, let's (try to) dock. If two ships try to dock at once, neither will be able to.
-        #         if ship.can_dock(planet):
-        #             # We add the command by appending it to the command_queue
-        #             command_queue.append(ship.dock(planet))
-        #         else:
-        #             # If we can't dock, we move towards the closest empty point near this planet (by using closest_point_to)
-        #             # with constant speed. Don't worry about pathfinding for now, as the command will do it for you.
-        #             # We run this navigate command each turn until we arrive to get the latest move.
-        #             # Here we move at half our maximum speed to better control the ships
-        #             # In order to execute faster we also choose to ignore ship collision calculations during navigation.
-        #             # This will mean that you have a higher probability of crashing into ships, but it also means you will
-        #             # make move decisions much quicker. As your skill progresses and your moves turn more optimal you may
-        #             # wish to turn that option off.
-        #             navigate_command = ship.navigate(ship.closest_point_to(planet), game_map,
-        #                                              speed=hlt.constants.MAX_SPEED / 2, ignore_ships=True)
-        #             # If the move is possible, add it to the command_queue (if there are too many obstacles on the way
-        #             # or we are trapped (or we reached our destination!), navigate_command will return null;
-        #             # don't fret though, we can run the command again the next turn)
-        #             if navigate_command:
-        #                 command_queue.append(navigate_command)
-        #         break
 
         # Send our set of commands to the Halite engine for this turn
         game.send_command_queue(command_queue)
         # TURN END
-        # GAME END
+    
+    # GAME END
 
 
 if __name__ == '__main__':

@@ -314,6 +314,26 @@ class Ship(Entity):
         """
         return self.calculate_distance_between(planet) <= planet.radius + constants.DOCK_RADIUS
 
+    def closest_planet(self, game_map):
+        """
+        Returns the closest planet to this ship
+
+        :param game_map: The Halite game map
+        :return: The closest planet to this ship
+        """
+        planets = game_map.all_planets()
+
+        min_dist = self.calculate_distance_between(planets[0])
+        min_planet = planets[0]
+
+        for planet in planets[1:]:
+            dist = self.calculate_distance_between(planet)
+            if dist < min_dist:
+                min_planet = planet
+                min_dist = dist
+
+        return min_planet
+
     def _link(self, players, planets):
         """
         This function serves to take the id values set in the parse function and use it to populate the ship
