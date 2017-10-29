@@ -30,8 +30,7 @@ class Net(nn.Module):
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.RMSprop(self.parameters())
 
-        if False and torch.cuda.is_available():
-            self.cuda()
+
 
         for epoch in range(1000):  # loop over the dataset multiple times
             if epoch % 100 == 0:

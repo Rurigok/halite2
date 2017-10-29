@@ -5,8 +5,9 @@ from anathema import net as anet
 
 import hlt
 import logging
+import math, random
+import numpy
 import torch
-import random, math
 
 NUM_FEATURES = 7
 NUM_OUTPUT_FEATURES = 3
@@ -60,6 +61,8 @@ def main():
 
     if HAS_CUDA:
         input_tensor = input_tensor.cuda()
+        output_tensor = output_tensor.cuda()
+        logging.info("Made it here")
 
     net = anet.Net()
     outputs = []
@@ -72,7 +75,7 @@ def main():
 
         # Rebuild our input tensor based on the map state for this turn
         convert_map_to_tensor(game_map, input_tensor, my_ships)
-        vi = torch.autograd.Variable(input_tensor)
+        vi = torch.autograd.Variable(input_tensor).cuda()
         move_commands = net.forward(vi)[0].permute(1, 2, 0)
 
         for (x, y) in my_ships:
@@ -81,11 +84,11 @@ def main():
 
             angle = (angle + (one_or_negative_one() * distribution()))
             output_tensor[0][0][x][y] = angle
-            command_angle = int(360 * angle)
+            command_angle = int(360 * angle) % 360
 
             speed = speed + (one_or_negative_one() * distribution())
             output_tensor[0][1][x][y] = speed
-            command_speed = int(7 * speed)
+            command_speed = numpy.clip(int(7 * speed), 0, 7)
 
             dock = dock + (one_or_negative_one() * distribution())
             output_tensor[0][2][x][y] = dock
