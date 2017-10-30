@@ -8,10 +8,12 @@ import logging
 import math, random
 import numpy
 import torch
+import platform
 
 NUM_FEATURES = 7
 NUM_OUTPUT_FEATURES = 3
-HAS_CUDA = torch.cuda.is_available()
+HAS_CUDA = torch.cuda.is_available() and (platform.system() != 'Windows')
+logging.info((platform.system()))
 
 def convert_map_to_tensor(game_map, input_tensor, my_ships):
     my_ships.clear()

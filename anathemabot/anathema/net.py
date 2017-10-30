@@ -3,14 +3,15 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
+import platform
+HAS_CUDA = torch.cuda.is_available() and (platform.system() != 'Windows')
 
 class Net(nn.Module):
 
     def __init__(self):
         super(Net, self).__init__()
 
-        if torch.cuda.is_available():
+        if HAS_CUDA:
             self.cuda()
 
         self.layer1 = nn.Conv2d(7, 16, kernel_size=7, stride=1, padding=3)
@@ -25,14 +26,14 @@ class Net(nn.Module):
         out = F.sigmoid(self.layer4(out))
         return out
 
-    def my_train(self, inputs, labels):
+    def my_train(self, inputs, labels, epochs=10):
 
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.RMSprop(self.parameters())
 
 
 
-        for epoch in range(1000):  # loop over the dataset multiple times
+        for epoch in range(epochs):  # loop over the dataset multiple times
             if epoch % 100 == 0:
                 print(epoch)
             running_loss = 0.0
@@ -41,7 +42,7 @@ class Net(nn.Module):
 
 
                 # wrap them in Variable
-                if torch.cuda.is_available():
+                if HAS_CUDA:
                     inputs = inputs.cuda()
                     labels = labels.cuda()
                 ins, outs = Variable(inputs), Variable(labels)
