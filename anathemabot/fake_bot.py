@@ -7,20 +7,18 @@ import random
 import os, sys
 import uuid
 
-NAMED_PIPE = "anathemapipe"
 PLAYER_ID = uuid.uuid4()
+NAMED_PIPE = "pipes/anathema_pipe_" + PLAYER_ID
 
 with open(NAMED_PIPE) as fifo:
-    # halite exe -> us -> anathema -> us -> halite exe
+
+
 
     # for each line from halite executable
     for line_from_halite in sys.stdin:
 
         fifo.write(line_from_halite) # write to anathema
 
-        # if the data is not ordered correctly, may be impossible to get the frame that we want here.
-        # may need to use sockets :(
-        # is data line based??
         from_net = fifo.readline() # read from anathema
 
         # write to halite executable
