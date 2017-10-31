@@ -49,5 +49,6 @@ int main(int argc, char * argv[]) {
     }
 
     close(pipeFd);
+    return EXIT_SUCCESS;
 
 }
