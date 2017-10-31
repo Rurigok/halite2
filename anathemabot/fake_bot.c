@@ -23,13 +23,17 @@ int main(int argc, char * argv[]) {
     assert(timeId[n] == '\0');
     assert(c == n);
 
-    char fifoName[strlen(NAMED_PIPE_PREFIX) + n];
+    int fifoNameSz = strlen(NAMED_PIPE_PREFIX) + n;
+    char fifoName[fifoNameSz];
+    memset(fifoName, 0, fifoNameSz);
     strcat(fifoName, NAMED_PIPE_PREFIX);
     strcat(fifoName, timeId);
 
     if (fifoName[strlen(NAMED_PIPE_PREFIX) + n] == '\0') {
         printf("end is null");
     }
+
+    printf("%s\n", fifoName);
 
     // create named pipe
     if (mkfifo(fifoName, 0666) != 0) {
