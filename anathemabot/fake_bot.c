@@ -26,7 +26,7 @@ int main(int argc, char * argv[]) {
     // create named pipe
     char *fifoName = strcat(NAMED_PIPE_PREFIX, timeId);
 
-    if (mkfifo(fifoName) != 0) {
+    if (mkfifo(fifoName, 0666) != 0) {
         perror("pipe");
         exit(EXIT_FAILURE);
     }
