@@ -1,1 +1,1 @@
-CMakeLists.txt not found in C:\Users\Andrew\Documents\halite2\anathemabot
+CMakeLists.txt not found in C:\Users\Root\Documents\projects\halite2\anathemabot
