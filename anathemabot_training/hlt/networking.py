@@ -10,40 +10,36 @@ class Game:
     :ivar map: Current map representation
     :ivar initial_map: The initial version of the map before game starts
     """
-    @staticmethod
-    def _send_string(s):
+    def _send_string(self, s):
         """
         Send data to the game. Call :function:`done_sending` once finished.
 
         :param str s: String to send
         :return: nothing
         """
-        sys.stdout.write(s)
-        sys.stdout.flush()
+        self.to_halite_stream.write(s)
+        self.to_halite_stream.flush()
 
-    @staticmethod
-    def _done_sending():
+    def _done_sending(self):
         """
         Finish sending commands to the game.
 
         :return: nothing
         """
-        sys.stdout.write('\n')
-        sys.stdout.flush()
+        self.to_halite_stream.write('\n')
+        self.to_halite_stream.flush()
 
-    @staticmethod
-    def _get_string():
+    def _get_string(self):
         """
         Read input from the game.
 
         :return: The input read from the Halite engine
         :rtype: str
         """
-        result = sys.stdin.readline().rstrip('\n')
+        result = self.from_halite_stream.readline().rstrip('\n')
         return result
 
-    @staticmethod
-    def send_command_queue(command_queue):
+    def send_command_queue(self, command_queue):
         """
         Issue the given list of commands.
 
@@ -51,9 +47,9 @@ class Game:
         :return: nothing
         """
         for command in command_queue:
-            Game._send_string(command)
+            self._send_string(command)
 
-        Game._done_sending()
+        self._done_sending()
 
     @staticmethod
     def _set_up_logging(tag, name):
@@ -68,12 +64,15 @@ class Game:
         logging.basicConfig(filename=log_file, level=logging.DEBUG, filemode='w')
         logging.info("Initialized bot {}".format(name))
 
-    def __init__(self, name):
+    def __init__(self, name, from_halite_stream, to_halite_stream):
         """
         Initialize the bot with the given name.
 
         :param name: The name of the bot.
         """
+        self.from_halite_stream = from_halite_stream
+        self.to_halite_stream = to_halite_stream
+
         tag = int(self._get_string())
         Game._set_up_logging(tag, name)
         width, height = [int(x) for x in self._get_string().strip().split()]

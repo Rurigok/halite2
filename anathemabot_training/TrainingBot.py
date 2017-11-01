@@ -80,7 +80,7 @@ def run_game(num_players):
         from_halite_fifos[i] = open("pipes/from_halite_{}".format(i), "r")
         to_halite_fifos[i] = open("pipes/to_halite_{}".format(i), "w")
 
-        games_per_player.append(hlt.Game("Anathema"))
+        games_per_player.append(hlt.Game("Anathema", from_halite_fifos[i], to_halite_fifos[i]))
         logging.info("Starting << anathema >> for player {}".format(i))
         outputs_per_player.append([])
         ships_per_player.append({})
