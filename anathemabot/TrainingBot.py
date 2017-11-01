@@ -10,6 +10,9 @@ import numpy
 import torch
 import platform
 
+NUM_PLAYERS = 2
+NUM_GAMES = 1000
+
 NUM_FEATURES = 7
 NUM_OUTPUT_FEATURES = 3
 HAS_CUDA = torch.cuda.is_available() and (platform.system() != 'Windows')
@@ -53,13 +56,27 @@ def distribution():
     return (1 - math.sqrt(1 - random.random()))
 
 def main():
-    # GAME START
-    game = hlt.Game("Anathema")
-    logging.info("Starting << anathema >>")
+    # load model from file
+    pass
 
-    # Initialize zeroed input tensor
-    input_tensor = torch.FloatTensor(1, NUM_FEATURES, game.map.width, game.map.height).zero_()
-    output_tensor = torch.FloatTensor(1, NUM_OUTPUT_FEATURES, game.map.width, game.map.height).zero_()
+def run_game(num_players):
+
+    # GAME START
+    games_per_player = []
+    maps_per_player = []
+    outputs_per_player = []
+    ships_per_player = []
+
+    for i in range(num_players):
+        games_per_player.append(hlt.Game("Anathema"))
+        logging.info("Starting << anathema >> for player {}".format(i))
+        outputs_per_player.append([])
+        ships_per_player.append({})
+        maps_per_player.append(None)
+
+    # Initialize zeroed input/output tensors
+    input_tensor = torch.FloatTensor(1, NUM_FEATURES, games_per_player[0].width, games_per_player[0].height).zero_()
+    output_tensor = torch.FloatTensor(1, NUM_OUTPUT_FEATURES, games_per_player[0].width, games_per_player[0].height).zero_()
 
     if HAS_CUDA:
         input_tensor = input_tensor.cuda()
@@ -67,63 +84,65 @@ def main():
         logging.info("Made it here")
 
     net = anet.Net()
-    outputs = []
-    my_ships = {}
 
     while True:
         # TURN START
-        game_map = game.update_map()
-        command_queue = []
+        for i, game in enumerate(games_per_player):
 
-        # Rebuild our input tensor based on the map state for this turn
-        convert_map_to_tensor(game_map, input_tensor, my_ships)
-        vi = torch.autograd.Variable(input_tensor)
+            # need a way to detect when this player has lost and shouldnt be updated anymore
+            game_map = game.update_map()
 
-        if HAS_CUDA:
-            vi = vi.cuda()
+            command_queue = []
+            my_ships = ships_per_player[i]
 
-        move_commands = net.forward(vi)[0].permute(1, 2, 0)
+            # Rebuild our input tensor based on the map state for this turn
+            convert_map_to_tensor(game_map, input_tensor, my_ships)
+            vi = torch.autograd.Variable(input_tensor)
 
-        for (x, y) in my_ships:
-            this_ship = my_ships[(x, y)]
-            angle, speed, dock = move_commands[x][y].data
+            if HAS_CUDA:
+                vi = vi.cuda()
 
-            angle = (angle + (one_or_negative_one() * distribution()))
-            output_tensor[0][0][x][y] = angle
-            command_angle = int(360 * angle) % 360
+            move_commands = net.forward(vi)[0].permute(1, 2, 0)
 
-            speed = speed + (one_or_negative_one() * distribution())
-            output_tensor[0][1][x][y] = speed
-            command_speed = numpy.clip(int(7 * speed), 0, 7)
+            for (x, y) in my_ships:
+                this_ship = my_ships[(x, y)]
+                angle, speed, dock = move_commands[x][y].data
 
-            dock = dock + (one_or_negative_one() * distribution())
-            output_tensor[0][2][x][y] = dock
-            command_dock = dock
+                angle = (angle + (one_or_negative_one() * distribution()))
+                output_tensor[0][0][x][y] = angle
+                command_angle = int(360 * angle) % 360
 
-            outputs.append(output_tensor)
+                speed = speed + (one_or_negative_one() * distribution())
+                output_tensor[0][1][x][y] = speed
+                command_speed = numpy.clip(int(7 * speed), 0, 7)
 
-            # Execute ship command
-            if command_dock < .5:
-                # we want to undock
-                if this_ship.docking_status.value == this_ship.DockingStatus.DOCKED:
-                    command_queue.append(this_ship.undock())
+                dock = dock + (one_or_negative_one() * distribution())
+                output_tensor[0][2][x][y] = dock
+                command_dock = dock
+
+                outputs_per_player[i].append(output_tensor)
+
+                # Execute ship command
+                if command_dock < .5:
+                    # we want to undock
+                    if this_ship.docking_status.value == this_ship.DockingStatus.DOCKED:
+                        command_queue.append(this_ship.undock())
+                    else:
+                        command_queue.append(this_ship.thrust(command_speed, command_angle))
                 else:
-                    command_queue.append(this_ship.thrust(command_speed, command_angle))
-            else:
-                # we want to dock
-                if this_ship.docking_status.value == this_ship.DockingStatus.UNDOCKED:
-                    closest_planet = this_ship.closest_planet(game_map)
-                    if this_ship.can_dock(closest_planet):
-                        command_queue.append(this_ship.dock(closest_planet))
-                else:
-                    command_queue.append(this_ship.thrust(command_speed, command_angle))
+                    # we want to dock
+                    if this_ship.docking_status.value == this_ship.DockingStatus.UNDOCKED:
+                        closest_planet = this_ship.closest_planet(game_map)
+                        if this_ship.can_dock(closest_planet):
+                            command_queue.append(this_ship.dock(closest_planet))
+                    else:
+                        command_queue.append(this_ship.thrust(command_speed, command_angle))
 
-        # Send our set of commands to the Halite engine for this turn
-        game.send_command_queue(command_queue)
-        # TURN END
-    
-    # GAME END
+            # Send our set of commands to the Halite engine for this turn
+            game.send_command_queue(command_queue)
+            # TURN END
 
+    # games are done
 
 if __name__ == '__main__':
     try:
