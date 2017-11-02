@@ -36,7 +36,18 @@ class Game:
         :return: The input read from the Halite engine
         :rtype: str
         """
-        result = self.from_halite_stream.readline().rstrip('\n')
+
+        tmp = self.from_halite_stream.readline()
+
+        while (tmp == ''):
+            tmp = self.from_halite_stream.readline()
+
+        result = tmp.rstrip('\n')
+
+        if result == 'Done.':
+            print('Finished with the game.')
+            raise ValueError
+
         return result
 
     def send_command_queue(self, command_queue):

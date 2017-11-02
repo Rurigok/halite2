@@ -6,6 +6,11 @@ import torch.optim as optim
 import platform
 HAS_CUDA = torch.cuda.is_available() and (platform.system() != 'Windows')
 
+
+if HAS_CUDA:
+    torch.cuda.device(0)
+    print(torch.cuda.device_count())
+
 class Net(nn.Module):
 
     def __init__(self):
@@ -28,16 +33,20 @@ class Net(nn.Module):
 
     def my_train(self, inputs, labels, epochs=10):
 
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.MSELoss()
         optimizer = optim.RMSprop(self.parameters())
 
 
 
         for epoch in range(epochs):  # loop over the dataset multiple times
-            if epoch % 100 == 0:
-                print(epoch)
+            if epoch % 1 == 0:
+                print("Epoch:", epoch, "out of:", epochs)
             running_loss = 0.0
             for i, data in enumerate(inputs):
+
+                if i % 10 == 0:
+                    print("    On", i, "out of", len(inputs))
+
                 # get the inputs
 
 

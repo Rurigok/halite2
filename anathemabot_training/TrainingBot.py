@@ -12,7 +12,7 @@ import numpy
 import subprocess
 import sys
 import torch
-import platform
+import platform, os
 
 NUM_PLAYERS = 2
 NUM_GAMES = 1000
@@ -20,6 +20,10 @@ NUM_GAMES = 1000
 NUM_FEATURES = 7
 NUM_OUTPUT_FEATURES = 3
 HAS_CUDA = torch.cuda.is_available() and (platform.system() != 'Windows')
+
+if HAS_CUDA:
+    torch.cuda.device(0)
+
 logging.info((platform.system()))
 
 def convert_map_to_tensor(game_map, input_tensor, my_ships):
@@ -69,9 +73,9 @@ def run_game(num_players, net):
     # initialize halite
     run_commands = []
     for i in range(num_players):
-        run_commands.append('"./fake_bot {}"'.format(i))
+        run_commands.append("./fake_bot {}".format(i))
 
-    subprocess.Popen(["./halite", "-t", "-d", '240 160'] + run_commands)
+    subprocess.Popen(["./halite", "-t", "-d", '120 80'] + run_commands)
 
     # GAME START
     games_per_player = []
@@ -85,19 +89,22 @@ def run_game(num_players, net):
     to_halite_fifos = []
 
     for i in range(num_players):
-        from_halite_fifos[i] = open("pipes/from_halite_{}".format(i), "r")
-        to_halite_fifos[i] = open("pipes/to_halite_{}".format(i), "w")
+        from_halite_fifos.append(os.fdopen(os.open("pipes/from_halite_{}".format(i), os.O_RDONLY|os.O_NONBLOCK), "r"))
+        to_halite_fifos.append(open("pipes/to_halite_{}".format(i), "w"))
+
+        
 
         games_per_player.append(hlt.Game("Anathema", from_halite_fifos[i], to_halite_fifos[i]))
         logging.info("Starting << anathema >> for player {}".format(i))
         outputs_per_player.append([])
+        board_states_per_player.append([])
         ships_per_player.append({})
         maps_per_player.append(None)
         eliminated.append(False)
 
     # Initialize zeroed input/output tensors
-    input_tensor = torch.FloatTensor(1, NUM_FEATURES, games_per_player[0].width, games_per_player[0].height).zero_()
-    output_tensor = torch.FloatTensor(1, NUM_OUTPUT_FEATURES, games_per_player[0].width, games_per_player[0].height).zero_()
+    input_tensor = torch.FloatTensor(1, NUM_FEATURES, games_per_player[0].map.width, games_per_player[0].map.height).zero_()
+    output_tensor = torch.FloatTensor(1, NUM_OUTPUT_FEATURES, games_per_player[0].map.width, games_per_player[0].map.height).zero_()
 
     if HAS_CUDA:
         input_tensor = input_tensor.cuda()
@@ -114,6 +121,9 @@ def run_game(num_players, net):
 
             # need a way to detect when this player has lost and shouldnt be updated anymore
             try:
+
+                #subprocess.call(["ps", "-ef", "|", "grep", "halite"])
+
                 game_map = game.update_map()
             except ValueError as e:
                 # this player is done playing
@@ -125,14 +135,20 @@ def run_game(num_players, net):
 
                 if all(eliminated):
                     return board_states_per_player[i], outputs_per_player[i]
+                else:
+                    continue
 
             command_queue = []
             my_ships = ships_per_player[i]
 
             # Rebuild our input tensor based on the map state for this turn
             convert_map_to_tensor(game_map, input_tensor, my_ships)
-            board_states_per_player[i].append(input_tensor)
+            board_states_per_player[i].append(input_tensor[0])
             vi = torch.autograd.Variable(input_tensor)
+
+            outputs_per_player[i].append(output_tensor[0])
+
+            
 
             if HAS_CUDA:
                 vi = vi.cuda()
@@ -155,7 +171,8 @@ def run_game(num_players, net):
                 output_tensor[0][2][x][y] = dock
                 command_dock = dock
 
-                outputs_per_player[i].append(output_tensor)
+                
+
 
                 # Execute ship command
                 if command_dock < .5:
@@ -199,20 +216,42 @@ def main():
     file_prefix, games_played = model_file.split("-")
     games_played = int(games_played)
 
+    net.cuda()
+
     while True:
+
+        states, outputs = [], []
 
         for game_id in range(0, manager_constants.rollout_games):
 
-            states, outputs = run_game(NUM_PLAYERS, net)
+            tstates, toutputs = run_game(NUM_PLAYERS, net)
 
-            net.my_train(torch.Tensor(states), torch.Tensor(outputs), epochs=10)
+            states += tstates
+            outputs += toutputs
+
+            print("Training:", game_id)
+            print('here', len(states), len(outputs))
+
+            
             games_played += 1
-
+        net.my_train(torch.stack(states), torch.stack(outputs), epochs=1)
+        print("Saving")
         torch.save(net, "{}-{}".format(file_prefix, games_played))
 
-if __name__ == '__main__':
-    try:
-        main()
-    except:
-        logging.exception("Error in main program")
-        raise
+        
+try:
+    if __name__ == '__main__':
+        try:
+            main()
+        except:
+            logging.exception("Error in main program")
+            
+            raise
+except:
+    pass
+finally:
+    subprocess.call(["pkill", "fake"])
+    subprocess.call(["pkill", "halite"])
+    print("The end is nigh.")
+
+

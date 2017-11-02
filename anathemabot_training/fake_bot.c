@@ -9,11 +9,26 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <signal.h>
+
+int closeFlag = 0;
+
+void term(int signum) {
+    fprintf(stderr, "hrerekrejl");
+    closeFlag = 1;
+}
+
+
 
 int main(int argc, char * argv[]) {
 
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = term;
+    sigaction(SIGTERM, &action, NULL);
+    
     if (argc != 2) {
-        fprintf(stderr, "fake_bot did not get fifo ID!");
+        fprintf(stdout, "fake_bot did not get fifo ID!");
         exit(EXIT_FAILURE);
     }
 
@@ -26,8 +41,8 @@ int main(int argc, char * argv[]) {
     snprintf(fromFifoName, strlen(FROM_HALITE_PREFIX) + 2, "%s%d", FROM_HALITE_PREFIX, fifoID);
 
     // open named pipes
-    int fromPipeFd = open(fromFifoName, O_RDONLY);
-    int toPipeFd = open(toFifoName, O_WRONLY);
+    int fromPipeFd = open(fromFifoName, O_WRONLY);
+    int toPipeFd = open(toFifoName, O_RDONLY);
 
     if (fromPipeFd < 0) {
         perror("from pipe open");
@@ -50,35 +65,61 @@ int main(int argc, char * argv[]) {
     // }
     
     //dup2(STDIN_FILENO, pipe[0]);
-
+    int n;
     char buff[1000];
-
+    int log;
     switch (fork()) {
         case -1:
             perror("Fork failed.");
             exit(EXIT_FAILURE);
         case 0: // Child
-            
+            ;
+            char logName[1000];
+
+            snprintf(logName, 11, "Child%d.log", fifoID);
+
+            log = open(logName, O_WRONLY|O_CREAT, 0666);
 
             close(toPipeFd);
             // close(pipe[0]);
 
-            while (read(STDIN_FILENO, buff, 1000) > 0) {
-                int bytesWritten = write(fromPipeFd, buff, 1000);
+            while ((n = read(STDIN_FILENO, buff, 1000)) > 0) {
+
+                if (closeFlag) {
+                    write(log, "earera.\n", 7);
+                    printf("here");
+                    close(fromPipeFd);
+                    exit(EXIT_SUCCESS);
+                }
+
+                int other = write(log, buff, n);
+                int bytesWritten = write(fromPipeFd, buff, n);
             }
+
+            
+
+            write(fromPipeFd, "Done.\n", 6);
+            write(log, "Done.\n", 6);
+
+            close(fromPipeFd);
+            close(log);
             break;
         default: // Parent
-            
+            log = open("parent.log", O_WRONLY|O_CREAT, 0666);
 
             close(fromPipeFd);
             // close(pipe[0]);
             // close(pipe[1]);
 
-            while (read(toPipeFd, buff, 1000) > 0) {
-                int bytesWritten = write(STDOUT_FILENO, buff, 1000);
+            while ((n = read(toPipeFd, buff, 1000)) > 0) {
+                int other = write(log, buff, n);
+                int bytesWritten = write(STDOUT_FILENO, buff, n);
             }
+            close(toPipeFd);
     }
 
+    
+    
 
     // char buff[1000];
 
