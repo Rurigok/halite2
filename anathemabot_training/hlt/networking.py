@@ -39,8 +39,15 @@ class Game:
 
         tmp = self.from_halite_stream.readline()
 
+        count = 0
+
         while (tmp == ''):
+            count += 1
             tmp = self.from_halite_stream.readline()
+
+            if count > 1000000:
+                print("wtf")
+                raise ValueError
 
         result = tmp.rstrip('\n')
 

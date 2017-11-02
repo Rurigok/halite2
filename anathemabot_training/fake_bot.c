@@ -67,18 +67,18 @@ int main(int argc, char * argv[]) {
     //dup2(STDIN_FILENO, pipe[0]);
     int n;
     char buff[1000];
-    int log;
+    //int log;
     switch (fork()) {
         case -1:
             perror("Fork failed.");
             exit(EXIT_FAILURE);
         case 0: // Child
             ;
-            char logName[1000];
+            //char logName[1000];
 
-            snprintf(logName, 11, "Child%d.log", fifoID);
+            //snprintf(logName, 11, "Child%d.log", fifoID);
 
-            log = open(logName, O_WRONLY|O_CREAT, 0666);
+            //log = open(logName, O_WRONLY|O_CREAT, 0666);
 
             close(toPipeFd);
             // close(pipe[0]);
@@ -86,33 +86,33 @@ int main(int argc, char * argv[]) {
             while ((n = read(STDIN_FILENO, buff, 1000)) > 0) {
 
                 if (closeFlag) {
-                    write(log, "earera.\n", 7);
+                    //write(log, "earera.\n", 7);
                     printf("here");
                     close(fromPipeFd);
                     exit(EXIT_SUCCESS);
                 }
 
-                int other = write(log, buff, n);
+                //int other = write(log, buff, n);
                 int bytesWritten = write(fromPipeFd, buff, n);
             }
 
             
 
-            write(fromPipeFd, "Done.\n", 6);
-            write(log, "Done.\n", 6);
+            int bytes = write(fromPipeFd, "Done.\n", 6);
+            //write(log, "Done.\n", 6);
 
             close(fromPipeFd);
-            close(log);
+            //close(log);
             break;
         default: // Parent
-            log = open("parent.log", O_WRONLY|O_CREAT, 0666);
+            //log = open("parent.log", O_WRONLY|O_CREAT, 0666);
 
             close(fromPipeFd);
             // close(pipe[0]);
             // close(pipe[1]);
 
             while ((n = read(toPipeFd, buff, 1000)) > 0) {
-                int other = write(log, buff, n);
+                //int other = write(log, buff, n);
                 int bytesWritten = write(STDOUT_FILENO, buff, n);
             }
             close(toPipeFd);

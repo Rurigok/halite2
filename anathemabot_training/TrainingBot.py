@@ -26,6 +26,9 @@ if HAS_CUDA:
 
 logging.info((platform.system()))
 
+def clamp(value, small, large):
+    return max(min(value, large), small)
+
 def convert_map_to_tensor(game_map, input_tensor, my_ships):
     my_ships.clear()
 
@@ -61,7 +64,7 @@ def one_or_negative_one():
     return 1 if random.random() > .5 else -1
 
 def skew_towards_zero():
-    return (1 - math.sqrt(1 - random.random()))
+    return (1 - math.sqrt(math.sqrt(1 - random.random())))
 
 
 def run_game(num_players, net):
@@ -75,7 +78,7 @@ def run_game(num_players, net):
     for i in range(num_players):
         run_commands.append("./fake_bot {}".format(i))
 
-    subprocess.Popen(["./halite", "-t", "-d", '120 80'] + run_commands)
+    subprocess.Popen(["./halite", "-t", "-r", "-d", '90 60'] + run_commands)
 
     # GAME START
     games_per_player = []
@@ -87,6 +90,8 @@ def run_game(num_players, net):
 
     from_halite_fifos = []
     to_halite_fifos = []
+
+    made_ships = False
 
     for i in range(num_players):
         from_halite_fifos.append(os.fdopen(os.open("pipes/from_halite_{}".format(i), os.O_RDONLY|os.O_NONBLOCK), "r"))
@@ -134,20 +139,29 @@ def run_game(num_players, net):
                 to_halite_fifos[i].close()
 
                 if all(eliminated):
-                    return board_states_per_player[i], outputs_per_player[i]
+                    if made_ships:
+                        return board_states_per_player[i], outputs_per_player[i]
+                    else:
+                        return [], []
                 else:
                     continue
 
             command_queue = []
             my_ships = ships_per_player[i]
+            if len(my_ships.keys()) > 3:
+                made_ships = True
+            input_tensor = torch.FloatTensor(1, NUM_FEATURES, games_per_player[0].map.width, games_per_player[0].map.height).zero_()
+            output_tensor = torch.FloatTensor(1, NUM_OUTPUT_FEATURES, games_per_player[0].map.width, games_per_player[0].map.height).zero_()
 
             # Rebuild our input tensor based on the map state for this turn
             convert_map_to_tensor(game_map, input_tensor, my_ships)
-            board_states_per_player[i].append(input_tensor[0])
+            if len(my_ships.keys()) > 3:
+                board_states_per_player[i].append(input_tensor[0])
+                outputs_per_player[i].append(output_tensor[0])
+
             vi = torch.autograd.Variable(input_tensor)
 
-            outputs_per_player[i].append(output_tensor[0])
-
+            
             
 
             if HAS_CUDA:
@@ -167,7 +181,7 @@ def run_game(num_players, net):
                 output_tensor[0][1][x][y] = speed
                 command_speed = numpy.clip(int(7 * speed), 0, 7)
 
-                dock = dock + (one_or_negative_one() * skew_towards_zero())
+                dock = numpy.clip(dock + (one_or_negative_one() * skew_towards_zero()), 0, 1)
                 output_tensor[0][2][x][y] = dock
                 command_dock = dock
 
@@ -175,22 +189,27 @@ def run_game(num_players, net):
 
 
                 # Execute ship command
-                if command_dock < .5:
+                if command_dock < 0.1:
                     # we want to undock
-                    if this_ship.docking_status.value == this_ship.DockingStatus.DOCKED:
-                        command_queue.append(this_ship.undock())
+                    if this_ship.docking_status.value == this_ship.DockingStatus.DOCKED.value:
+                        
+                        output_tensor[0][2][x][y] = 1 - skew_towards_zero()
+                        
+                        #command_queue.append(this_ship.undock())
                     else:
                         command_queue.append(this_ship.thrust(command_speed, command_angle))
                 else:
                     # we want to dock
-                    if this_ship.docking_status.value == this_ship.DockingStatus.UNDOCKED:
+                    if this_ship.docking_status.value == this_ship.DockingStatus.UNDOCKED.value:
                         closest_planet = this_ship.closest_planet(game_map)
                         if this_ship.can_dock(closest_planet):
                             command_queue.append(this_ship.dock(closest_planet))
-                    else:
-                        command_queue.append(this_ship.thrust(command_speed, command_angle))
+                        else:
+                            
+                            command_queue.append(this_ship.thrust(command_speed, command_angle))
 
             # Send our set of commands to the Halite engine for this turn
+
             game.send_command_queue(command_queue)
 
 def get_model_file_arg():
@@ -222,6 +241,8 @@ def main():
 
         states, outputs = [], []
 
+        print("Game ID:", games_played)
+
         for game_id in range(0, manager_constants.rollout_games):
 
             tstates, toutputs = run_game(NUM_PLAYERS, net)
@@ -234,9 +255,11 @@ def main():
 
             
             games_played += 1
-        net.my_train(torch.stack(states), torch.stack(outputs), epochs=1)
-        print("Saving")
-        torch.save(net, "{}-{}".format(file_prefix, games_played))
+
+        if len(states) > 0:
+            net.my_train(torch.stack(states), torch.stack(outputs), epochs=1)
+            print("Saving")
+            torch.save(net, "{}-{}".format(file_prefix, games_played))
 
         
 try:
