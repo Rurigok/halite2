@@ -12,42 +12,13 @@
 
 int main(int argc, char * argv[]) {
 
-    // generate a unique ID via current nanosecond time
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
+    int fifoID = atoi(argv[1]);
 
-    const int n = snprintf(NULL, 0, "%ld", ts.tv_nsec); // length of nsec field without null byte
-    assert(n > 0);
-    char timeId[n + 1];
-    int c = snprintf(timeId, n + 1, "%lu", ts.tv_nsec);
-    assert(timeId[n] == '\0');
-    assert(c == n);
+    char toFifoName[strlen(TO_HALITE_PREFIX) + 2];
+    char fromFifoName[strlen(FROM_HALITE_PREFIX) + 2];
 
-    int fifoNameSz = strlen(NAMED_PIPE_PREFIX) + n + 1;
-    char baseFifoName[fifoNameSz];
-    memset(baseFifoName, 0, fifoNameSz);
-    snprintf(baseFifoName, fifoNameSz, "%s%s", NAMED_PIPE_PREFIX, timeId);
-
-    char toFifoName[fifoNameSz + strlen(TO_HALITE_SUFFIX) + 1];
-    char fromFifoName[fifoNameSz + strlen(FROM_HALITE_SUFFIX) + 1];
-
-    snprintf(toFifoName, fifoNameSz + strlen(TO_HALITE_SUFFIX) + 1, "%s%s", baseFifoName, TO_HALITE_SUFFIX);
-    snprintf(fromFifoName, fifoNameSz + strlen(FROM_HALITE_SUFFIX) + 1, "%s%s", baseFifoName, FROM_HALITE_SUFFIX);
-
-    // create 2 named pipes, 1 for reading and 1 for writing
-    if (mkfifo(toFifoName, 0666) != 0) {
-        perror("to pipe");
-        exit(EXIT_FAILURE);
-    }
-
-    fprintf(stderr, "Created fifo to halite: %s%s\n", toFifoName);
-
-    if (mkfifo(fromFifoName, 0666) != 0) {
-        perror("from pipe");
-        exit(EXIT_FAILURE);
-    }
-
-    fprintf(stderr, "Created fifo from halite: %s%s\n", fromFifoName);
+    snprintf(toFifoName, strlen(TO_HALITE_PREFIX) + 2, "%s%d", TO_HALITE_PREFIX, fifoID);
+    snprintf(fromFifoName, strlen(FROM_HALITE_PREFIX) + 2, "%s%d", FROM_HALITE_PREFIX, fifoID);
 
     // open named pipes
     int fromPipeFd = open(fromFifoName, O_RDONLY);
@@ -63,21 +34,55 @@ int main(int argc, char * argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // stdin to this program goes to from_halite pipe
-    if (dup2(fromPipeFd, STDIN_FILENO) < 0) {
-        perror("redirect stdin");
-        exit(EXIT_FAILURE);
+    // STDIN -> from_pipe fd
+    // to_pipe fd -> STDOUT
+
+    // int pipe[2];
+
+    // if (pipe(pipe) < 0) {
+    //     perror("Pipe creation failed.");
+    //     exit(EXIT_FAILURE);
+    // }
+    
+    //dup2(STDIN_FILENO, pipe[0]);
+
+    char buff[1000];
+
+    switch (fork()) {
+        case -1:
+            perror("Fork failed.");
+            exit(EXIT_FAILURE);
+        case 0: // Child
+            
+
+            close(toPipeFd);
+            // close(pipe[0]);
+
+            while (read(STDIN_FILENO, buff, 1000) > 0) {
+                int bytesWritten = write(fromPipeFd, buff, 1000);
+            }
+            break;
+        default: // Parent
+            
+
+            close(fromPipeFd);
+            // close(pipe[0]);
+            // close(pipe[1]);
+
+            while (read(toPipeFd, buff, 1000) > 0) {
+                int bytesWritten = write(STDOUT_FILENO, buff, 1000);
+            }
     }
 
-    close(fromPipeFd);
 
-    // to_halite pipe is redirected to stdout of this program
-    if (dup2(toPipeFd, STDOUT_FILENO) < 0) {
-        perror("redirect stdout");
-        exit(EXIT_FAILURE);
-    }
+    // char buff[1000];
 
-    close(toPipeFd);
+    // while (read(STDIN_FILENO, buff, 1000) > 0) {
+        
+    //     int bytesWritten = write(fromPipeFd, buff, 1000);
+        
+
+    // }
 
     return EXIT_SUCCESS;
 

@@ -69,7 +69,7 @@ def run_game(num_players, net):
     # initialize halite
     run_commands = []
     for i in range(num_players):
-        run_commands.append("./fake_bot {}".format(i))
+        run_commands.append('"./fake_bot {}"'.format(i))
 
     subprocess.Popen(["./halite", "-t", "-d", '240 160'] + run_commands)
 
