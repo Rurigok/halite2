@@ -7,6 +7,7 @@ import hlt
 import logging
 import math, random
 import numpy
+import subprocess
 import torch
 import platform
 
@@ -52,26 +53,25 @@ def convert_map_to_tensor(game_map, input_tensor, my_ships):
 def one_or_negative_one():
     return 1 if random.random() > .5 else -1
 
-def distribution():
+def skew_towards_zero():
     return (1 - math.sqrt(1 - random.random()))
 
-def main():
-    # load model from file
 
-    run_game(NUM_PLAYERS)
-
-def run_game(num_players):
+def run_game(num_players, net):
     """
     Runs a single game against itself. Uses the same network to calculate moves for EACH player in this game.
     :param num_players: Number of players to simulate during this game (2-4)
     :return: n/a
     """
+    # initialize halite
+    subprocess.Popen(["./halite", "-t", "-d", '240 160'] + (['./fake_bot'] * num_players))
 
     # GAME START
     games_per_player = []
     maps_per_player = []
     outputs_per_player = []
     ships_per_player = []
+    eliminated = []
 
     from_halite_fifos = []
     to_halite_fifos = []
@@ -85,6 +85,7 @@ def run_game(num_players):
         outputs_per_player.append([])
         ships_per_player.append({})
         maps_per_player.append(None)
+        eliminated.append(False)
 
     # Initialize zeroed input/output tensors
     input_tensor = torch.FloatTensor(1, NUM_FEATURES, games_per_player[0].width, games_per_player[0].height).zero_()
@@ -95,19 +96,27 @@ def run_game(num_players):
         output_tensor = output_tensor.cuda()
         logging.info("Made it here")
 
-    net = anet.Net()
-
     while True:
 
         # play out each player's turn
         for i, game in enumerate(games_per_player):
 
+            if eliminated[i]:
+                continue
+
             # need a way to detect when this player has lost and shouldnt be updated anymore
             try:
                 game_map = game.update_map()
             except ValueError as e:
-                # this player is done playing (need to determine if they lost or won)
-                pass
+                # this player is done playing
+                logging.info(e)
+                eliminated[i] = True
+
+                from_halite_fifos[i].close()
+                to_halite_fifos[i].close()
+
+                if all(eliminated):
+                    return outputs_per_player[i]
 
             command_queue = []
             my_ships = ships_per_player[i]
@@ -125,15 +134,15 @@ def run_game(num_players):
                 this_ship = my_ships[(x, y)]
                 angle, speed, dock = move_commands[x][y].data
 
-                angle = (angle + (one_or_negative_one() * distribution()))
+                angle = (angle + (one_or_negative_one() * skew_towards_zero()))
                 output_tensor[0][0][x][y] = angle
                 command_angle = int(360 * angle) % 360
 
-                speed = speed + (one_or_negative_one() * distribution())
+                speed = speed + (one_or_negative_one() * skew_towards_zero())
                 output_tensor[0][1][x][y] = speed
                 command_speed = numpy.clip(int(7 * speed), 0, 7)
 
-                dock = dock + (one_or_negative_one() * distribution())
+                dock = dock + (one_or_negative_one() * skew_towards_zero())
                 output_tensor[0][2][x][y] = dock
                 command_dock = dock
 
@@ -157,9 +166,12 @@ def run_game(num_players):
 
             # Send our set of commands to the Halite engine for this turn
             game.send_command_queue(command_queue)
-            # TURN END
 
-    # games are done
+def main():
+    # load model from file
+    net = anet.Net()
+
+    winning_outputs = run_game(NUM_PLAYERS, net)
 
 if __name__ == '__main__':
     try:
