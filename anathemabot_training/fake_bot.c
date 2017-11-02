@@ -12,6 +12,11 @@
 
 int main(int argc, char * argv[]) {
 
+    if (argc != 2) {
+        fprintf(stderr, "fake_bot did not get fifo ID!");
+        exit(EXIT_FAILURE);
+    }
+
     int fifoID = atoi(argv[1]);
 
     char toFifoName[strlen(TO_HALITE_PREFIX) + 2];
