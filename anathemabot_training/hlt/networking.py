@@ -45,7 +45,7 @@ class Game:
             count += 1
             tmp = self.from_halite_stream.readline()
 
-            if count > 1000000:
+            if count > 10000000:
                 print("wtf")
                 raise ValueError
 

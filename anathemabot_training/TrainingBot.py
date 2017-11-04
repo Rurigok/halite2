@@ -78,7 +78,7 @@ def run_game(num_players, net):
     for i in range(num_players):
         run_commands.append("./fake_bot {}".format(i))
 
-    subprocess.Popen(["./halite", "-t", "-r", "-d", '90 60'] + run_commands)
+    subprocess.Popen(["./halite", "-t", "-r", "-d", '60 40'] + run_commands)
 
     # GAME START
     games_per_player = []
