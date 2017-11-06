@@ -36,8 +36,8 @@ def convert_map_to_tensor(game_map, input_tensor, my_ships):
     for player in game_map.all_players():
         owner_feature = 0 if player.id == game_map.my_id else 1
         for ship in player.all_ships():
-            x = int(ship.x)
-            y = int(ship.y)
+            x = min(round(ship.x), game_map.width - 1)
+            y = min(round(ship.y), game_map.height - 1)
             # hp from [0, 1]
             input_tensor[0][0][x][y] = ship.health / 255
             # friendless: 0 if me, 1 if enemy
@@ -78,7 +78,7 @@ def run_game(num_players, net):
     for i in range(num_players):
         run_commands.append("./fake_bot {}".format(i))
 
-    subprocess.Popen(["./halite", "-t", "-r", "-d", '60 40'] + run_commands)
+    subprocess.Popen(["./halite", "-t", "-r", "-d", '120 80'] + run_commands)
 
     # GAME START
     games_per_player = []
@@ -94,7 +94,7 @@ def run_game(num_players, net):
     made_ships = False
 
     for i in range(num_players):
-        from_halite_fifos.append(os.fdopen(os.open("pipes/from_halite_{}".format(i), os.O_RDONLY|os.O_NONBLOCK), "r"))
+        from_halite_fifos.append(os.fdopen(os.open("pipes/from_halite_{}".format(i), os.O_RDONLY), "r"))
         to_halite_fifos.append(open("pipes/to_halite_{}".format(i), "w"))
 
         

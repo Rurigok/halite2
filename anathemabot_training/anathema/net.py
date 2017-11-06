@@ -42,32 +42,25 @@ class Net(nn.Module):
             if epoch % 1 == 0:
                 print("Epoch:", epoch, "out of:", epochs)
             running_loss = 0.0
-            for i, data in enumerate(inputs):
-
-                if i % 10 == 0:
-                    print("    On", i, "out of", len(inputs))
-
-                # get the inputs
 
 
-                # wrap them in Variable
-                if HAS_CUDA:
-                    inputs = inputs.cuda()
-                    labels = labels.cuda()
-                ins, outs = Variable(inputs), Variable(labels)
+            # get the inputs
 
-                # zero the parameter gradients
-                optimizer.zero_grad()
 
-                # forward + backward + optimize
-                outputs = self(ins)
-                loss = criterion(outputs, outs)
-                loss.backward()
-                optimizer.step()
+            # wrap them in Variable
+            if HAS_CUDA:
+                inputs = inputs.cuda()
+                labels = labels.cuda()
+            ins, outs = Variable(inputs), Variable(labels)
 
-                # print statistics
-                running_loss += loss.data[0]
-                if i % 2000 == 1999:  # print every 2000 mini-batches
-                    print('[%d, %5d] loss: %.3f' %
-                          (epoch + 1, i + 1, running_loss / 2000))
-                    running_loss = 0.0
+            # zero the parameter gradients
+            optimizer.zero_grad()
+
+            # forward + backward + optimize
+            outputs = self(ins)
+            loss = criterion(outputs, outs)
+            loss.backward()
+            optimizer.step()
+
+            # print statistics
+            running_loss += loss.data[0]

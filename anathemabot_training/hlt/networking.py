@@ -1,6 +1,7 @@
 import sys
 import logging
 import copy
+from time import sleep
 
 from . import game_map
 
@@ -36,20 +37,7 @@ class Game:
         :return: The input read from the Halite engine
         :rtype: str
         """
-
-        tmp = self.from_halite_stream.readline()
-
-        count = 0
-
-        while (tmp == ''):
-            count += 1
-            tmp = self.from_halite_stream.readline()
-
-            if count > 10000000:
-                print("wtf")
-                raise ValueError
-
-        result = tmp.rstrip('\n')
+        result = self.from_halite_stream.readline().rstrip("\n")
 
         if result == 'Done.':
             print('Finished with the game.')

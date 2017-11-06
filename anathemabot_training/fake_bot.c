@@ -78,7 +78,7 @@ int main(int argc, char * argv[]) {
                     exit(EXIT_SUCCESS);
                 }
 
-                //int other = write(log, buff, n);
+                //int other = write(log, buf, n);
                 int bytesWritten = write(fromPipeFd, buf, n);
             }
 
