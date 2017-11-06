@@ -8,6 +8,7 @@ import logging
 import math, random
 import numpy
 import torch
+import sys
 import platform
 
 NUM_FEATURES = 7
@@ -22,8 +23,8 @@ def convert_map_to_tensor(game_map, input_tensor, my_ships):
     for player in game_map.all_players():
         owner_feature = 0 if player.id == game_map.my_id else 1
         for ship in player.all_ships():
-            x = int(ship.x)
-            y = int(ship.y)
+            x = min(round(ship.x), game_map.width - 1)
+            y = min(round(ship.y), game_map.height - 1)
             # hp from [0, 1]
             input_tensor[0][0][x][y] = ship.health / 255
             # friendless: 0 if me, 1 if enemy
@@ -46,28 +47,28 @@ def convert_map_to_tensor(game_map, input_tensor, my_ships):
         # owner of this planet: -1 if me, 1 if enemy, 0 if unowned
         input_tensor[0][6][x][y] = (-1 if planet.owner == game_map.my_id else 1) if planet.is_owned() else 0
 
-def one_or_negative_one():
-    return 1 if random.random() > .5 else -1
-
-def distribution():
-    return (1 - math.sqrt(1 - random.random()))
-
 def main():
+
+    if len(sys.argv) != 2:
+        print("Missing model file for network")
+        exit(-1)
+
+    model_file = sys.argv[1]
+    net = torch.load(model_file)
+
+    if HAS_CUDA:
+        net = net.cuda()
+
     # GAME START
     game = hlt.Game("Anathema")
     logging.info("Starting << anathema >>")
 
     # Initialize zeroed input tensor
     input_tensor = torch.FloatTensor(1, NUM_FEATURES, game.map.width, game.map.height).zero_()
-    output_tensor = torch.FloatTensor(1, NUM_OUTPUT_FEATURES, game.map.width, game.map.height).zero_()
 
     if HAS_CUDA:
         input_tensor = input_tensor.cuda()
-        output_tensor = output_tensor.cuda()
-        logging.info("Made it here")
 
-    net = anet.Net()
-    outputs = []
     my_ships = {}
 
     while True:
@@ -88,19 +89,9 @@ def main():
             this_ship = my_ships[(x, y)]
             angle, speed, dock = move_commands[x][y].data
 
-            angle = (angle + (one_or_negative_one() * distribution()))
-            output_tensor[0][0][x][y] = angle
             command_angle = int(360 * angle) % 360
-
-            speed = speed + (one_or_negative_one() * distribution())
-            output_tensor[0][1][x][y] = speed
             command_speed = numpy.clip(int(7 * speed), 0, 7)
-
-            dock = dock + (one_or_negative_one() * distribution())
-            output_tensor[0][2][x][y] = dock
             command_dock = dock
-
-            outputs.append(output_tensor)
 
             # Execute ship command
             if command_dock < .5:
