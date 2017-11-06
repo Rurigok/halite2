@@ -56,21 +56,18 @@ int main(int argc, char * argv[]) {
 
     int n;
     char buf[BUFSIZ];
+    char logName[16];
     //int log;
     switch (fork()) {
         case -1:
             perror("Fork failed.");
             exit(EXIT_FAILURE);
         case 0: // Child
-            ;
-            //char logName[1000];
 
-            //snprintf(logName, 11, "Child%d.log", fifoID);
-
-            //log = open(logName, O_WRONLY|O_CREAT, 0666);
+            //snprintf(logName, 11, "child%d.log", fifoID);
+            //log = open(logName, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 
             close(toPipeFd);
-            // close(pipe[0]);
 
             while ((n = read(STDIN_FILENO, buf, BUFSIZ)) > 0) {
 
@@ -94,30 +91,19 @@ int main(int argc, char * argv[]) {
             //close(log);
             break;
         default: // Parent
-            //log = open("parent.log", O_WRONLY|O_CREAT, 0666);
+
+            //snprintf(logName, 12, "parent%d.log", fifoID);
+            //log = open(logName, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 
             close(fromPipeFd);
-            // close(pipe[0]);
-            // close(pipe[1]);
 
             while ((n = read(toPipeFd, buf, BUFSIZ)) > 0) {
                 //int other = write(log, buff, n);
                 int bytesWritten = write(STDOUT_FILENO, buf, n);
             }
+
             close(toPipeFd);
     }
-
-    
-    
-
-    // char buff[1000];
-
-    // while (read(STDIN_FILENO, buff, 1000) > 0) {
-        
-    //     int bytesWritten = write(fromPipeFd, buff, 1000);
-        
-
-    // }
 
     return EXIT_SUCCESS;
 
