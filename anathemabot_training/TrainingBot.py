@@ -161,9 +161,6 @@ def run_game(num_players, net):
 
             vi = torch.autograd.Variable(input_tensor)
 
-            
-            
-
             if HAS_CUDA:
                 vi = vi.cuda()
 
@@ -184,9 +181,6 @@ def run_game(num_players, net):
                 dock = numpy.clip(dock + (one_or_negative_one() * skew_towards_zero()), 0, 1)
                 output_tensor[0][2][x][y] = dock
                 command_dock = dock
-
-                
-
 
                 # Execute ship command
                 if command_dock < 0.1:
@@ -235,7 +229,8 @@ def main():
     file_prefix, games_played = model_file.split("-")
     games_played = int(games_played)
 
-    net.cuda()
+    if HAS_CUDA:
+        net.cuda()
 
     while True:
 

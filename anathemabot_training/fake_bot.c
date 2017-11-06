@@ -14,11 +14,8 @@
 int closeFlag = 0;
 
 void term(int signum) {
-    fprintf(stderr, "hrerekrejl");
     closeFlag = 1;
 }
-
-
 
 int main(int argc, char * argv[]) {
 
@@ -57,16 +54,8 @@ int main(int argc, char * argv[]) {
     // STDIN -> from_pipe fd
     // to_pipe fd -> STDOUT
 
-    // int pipe[2];
-
-    // if (pipe(pipe) < 0) {
-    //     perror("Pipe creation failed.");
-    //     exit(EXIT_FAILURE);
-    // }
-    
-    //dup2(STDIN_FILENO, pipe[0]);
     int n;
-    char buff[1000];
+    char buf[BUFSIZ];
     //int log;
     switch (fork()) {
         case -1:
@@ -83,7 +72,7 @@ int main(int argc, char * argv[]) {
             close(toPipeFd);
             // close(pipe[0]);
 
-            while ((n = read(STDIN_FILENO, buff, 1000)) > 0) {
+            while ((n = read(STDIN_FILENO, buf, BUFSIZ)) > 0) {
 
                 if (closeFlag) {
                     //write(log, "earera.\n", 7);
@@ -93,7 +82,7 @@ int main(int argc, char * argv[]) {
                 }
 
                 //int other = write(log, buff, n);
-                int bytesWritten = write(fromPipeFd, buff, n);
+                int bytesWritten = write(fromPipeFd, buf, n);
             }
 
             
@@ -111,9 +100,9 @@ int main(int argc, char * argv[]) {
             // close(pipe[0]);
             // close(pipe[1]);
 
-            while ((n = read(toPipeFd, buff, 1000)) > 0) {
+            while ((n = read(toPipeFd, buf, BUFSIZ)) > 0) {
                 //int other = write(log, buff, n);
-                int bytesWritten = write(STDOUT_FILENO, buff, n);
+                int bytesWritten = write(STDOUT_FILENO, buf, n);
             }
             close(toPipeFd);
     }
